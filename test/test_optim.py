@@ -3,6 +3,7 @@ import torch
 import unittest
 from tinygrad.tensor import Tensor
 from tinygrad.optim import Adam, SGD, RMSprop
+from extra.utils import get_parameters
 
 x_init = np.random.randn(1,3).astype(np.float32)
 W_init = np.random.randn(3,3).astype(np.float32)
@@ -14,7 +15,7 @@ def step_tinygrad(optim, kwargs={}):
   out = net.forward()
   out.backward()
   optim.step()
-  return net.x.data, net.W.data
+  return net.x.cpu().data, net.W.cpu().data
 
 def step_pytorch(optim, kwargs={}):
   net = TorchNet()
@@ -52,6 +53,7 @@ class TorchNet():
 
 
 class TestOptim(unittest.TestCase):
+
   def test_adam(self):
     for x,y in zip(step_tinygrad(Adam),
                    step_pytorch(torch.optim.Adam)):

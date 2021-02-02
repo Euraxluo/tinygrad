@@ -3,7 +3,6 @@ import time
 import cProfile
 import pstats
 import unittest
-import numpy as np
 import torch
 from tinygrad.tensor import Tensor
 
@@ -21,6 +20,7 @@ def stop_profile(pr, sort='cumtime'):
   ps.print_stats(0.2)
 
 class TestConvSpeed(unittest.TestCase):
+
   def test_mnist(self):
     # https://keras.io/examples/vision/mnist_convnet/
     conv = 3
@@ -40,29 +40,26 @@ class TestConvSpeed(unittest.TestCase):
     mp = torch.nn.MaxPool2d((2,2))
     lsm = torch.nn.LogSoftmax(dim=1)
 
-    with torch.autograd.profiler.profile(record_shapes=True) as tprof:
-      cnt = 5
-      fpt, bpt = 0.0, 0.0
-      for i in range(cnt):
-        et0 = time.time()
-        x = torch.randn(128, 1, 28, 28, requires_grad=True)
-        x = mp(c2d(x,c1).relu())
-        x = mp(c2d(x,c2).relu())
-        x = x.reshape(x.shape[0], -1)
-        out = lsm(x.matmul(l1))
-        out = out.mean()
-        et1 = time.time()
-        out.backward()
-        et2 = time.time()
-        fpt += (et1-et0)
-        bpt += (et2-et1)
+    cnt = 5
+    fpt, bpt = 0.0, 0.0
+    for i in range(cnt):
+      et0 = time.time()
+      x = torch.randn(128, 1, 28, 28, requires_grad=True)
+      x = mp(c2d(x,c1).relu())
+      x = mp(c2d(x,c2).relu())
+      x = x.reshape(x.shape[0], -1)
+      out = lsm(x.matmul(l1))
+      out = out.mean()
+      et1 = time.time()
+      out.backward()
+      et2 = time.time()
+      fpt += (et1-et0)
+      bpt += (et2-et1)
 
     fpt_baseline = (fpt*1000/cnt)
     bpt_baseline = (bpt*1000/cnt)
     print("torch forward pass:  %.3f ms" % fpt_baseline)
     print("torch backward pass: %.3f ms" % bpt_baseline)
-
-    print(tprof.key_averages().table(sort_by="self_cpu_time_total", row_limit=10))
 
     # ****** tinygrad compare *******
 
@@ -98,4 +95,3 @@ class TestConvSpeed(unittest.TestCase):
 
 if __name__ == '__main__':
   unittest.main()
-

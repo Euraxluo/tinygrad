@@ -1,38 +1,57 @@
+#import <Foundation/Foundation.h>
 #include <os/log.h>
 #include <stdio.h>
-#import <CoreFoundation/CoreFoundation.h>
 
-int ANECCompile(CFDictionaryRef param_1, CFDictionaryRef param_2, unsigned long param_3);
+typedef unsigned int ANECStatus;
 
-int main() {
-  os_log(OS_LOG_DEFAULT, "start compiler");
+int ANECCompile(NSDictionary* param_1, NSDictionary* param_2,
+    void (^param_3)(ANECStatus status,
+        NSDictionary* statusDictionary));
 
-  CFTypeRef ikeys[2];
-  ikeys[0] = CFSTR("NetworkPlistName");
-  ikeys[1] = CFSTR("NetworkPlistPath");
+int main(int argc, char* argv[])
+{
+    os_log(OS_LOG_DEFAULT, "start compiler");
 
-  CFTypeRef ivalues[2];
-  ivalues[0] = CFSTR("net.plist");
-  ivalues[1] = CFSTR("./");
-  
-  CFDictionaryRef iDictionary = CFDictionaryCreate(kCFAllocatorDefault, ikeys, ivalues, 2, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-  CFArrayRef array = CFArrayCreate(kCFAllocatorDefault, (const void**)&iDictionary, 1, &kCFTypeArrayCallBacks);
+    NSDictionary* iDictionary = @ {
+        @"NetworkPlistName" : [NSString stringWithCString:argv[1]
+                                                 encoding:NSUTF8StringEncoding],
+        @"NetworkPlistPath" : @"./",
+    };
+    NSArray* plistArray = @[ iDictionary ];
 
-  CFMutableDictionaryRef optionsDictionary = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-  CFMutableDictionaryRef flagsDictionary = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    NSMutableDictionary* optionsDictionary =
+        [NSMutableDictionary dictionaryWithCapacity:4];
+    NSMutableDictionary* flagsDictionary =
+        [NSMutableDictionary dictionaryWithCapacity:4];
+    optionsDictionary[@"InputNetworks"] = plistArray;
 
-  CFDictionaryAddValue(optionsDictionary, CFSTR("InputNetworks"), array);
-  CFDictionaryAddValue(optionsDictionary, CFSTR("OutputFileName"), CFSTR("model.hwx"));
-  CFDictionaryAddValue(optionsDictionary, CFSTR("OutputFilePath"), CFSTR("./"));
+    optionsDictionary[@"OutputFilePath"] = @"./";
 
-  CFDictionaryAddValue(flagsDictionary, CFSTR("TargetArchitecture"), CFSTR("h13"));
+    // h11 (or anything?) works here too, and creates different outputs that don't
+    // run
+    flagsDictionary[@"TargetArchitecture"] = @"h13";
 
-  //CFShow(optionsDictionary);
-  //CFShow(flagsDictionary);
+    if (argc > 2) {
+        optionsDictionary[@"OutputFileName"] = @"debug/model.hwx";
 
-  printf("hello\n");
-  int ret = ANECCompile(optionsDictionary, flagsDictionary, 0);
-  printf("compile: %d\n", ret);
+        flagsDictionary[@"CompileANEProgramForDebugging"] =
+            [NSNumber numberWithBool:YES];
+        int debug_mask = 0x7fffffff;
+        flagsDictionary[@"DebugMask"] = [NSNumber numberWithInt:debug_mask];
+    } else {
+        optionsDictionary[@"OutputFileName"] = @"model.hwx";
+    }
 
-  return ret;
+    void (^simpleBlock)(ANECStatus status, NSDictionary* statusDictionary) = ^(ANECStatus status, NSDictionary* statusDictionary) {
+        NSLog(@"status = %d\n", status);
+        // when status != 0 dump the dictionary
+        if (status)
+            NSLog(@"%@", statusDictionary);
+    };
+
+    printf("hello\n");
+    int ret = ANECCompile(optionsDictionary, flagsDictionary, simpleBlock);
+    printf("compile: %d\n", ret);
+
+    return ret;
 }
